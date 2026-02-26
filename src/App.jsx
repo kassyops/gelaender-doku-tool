@@ -226,14 +226,11 @@ function App() {
           </div>
         </div>
 
-        <div className="overflow-auto bg-slate-50" style={{ WebkitOverflowScrolling: "touch" }}
+        <div className="overflow-auto bg-white" style={{ WebkitOverflowScrolling: "touch" }}
           onClick={handleSvgClick}>
           <svg ref={svgRef} width={W} height={H} viewBox={`0 0 ${W} ${H}`}
             style={{ display: "block", width: "100%", height: "auto", cursor: pickingStart ? "crosshair" : "default" }}>
             <defs>
-              <pattern id="grd" width="15" height="15" patternUnits="userSpaceOnUse">
-                <path d="M15 0L0 0 0 15" fill="none" stroke="#e2e8f0" strokeWidth="0.3"/>
-              </pattern>
               <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
                 <feDropShadow dx="1" dy="2" stdDeviation="3" floodColor="#00000020"/>
               </filter>
@@ -244,7 +241,7 @@ function App() {
                 <stop offset="0%" stopColor="#94a3b8"/><stop offset="50%" stopColor="#78716c"/><stop offset="100%" stopColor="#94a3b8"/>
               </linearGradient>
             </defs>
-            <rect width={W} height={H} fill="url(#grd)"/>
+            <rect width={W} height={H} fill="white"/>
 
             {/* ── Rosenweg (horizontal road, bottom area) ── */}
             <rect x={tx(-10)} y={ty(230)} width={tl(420)} height={tl(40)} rx="2"
