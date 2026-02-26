@@ -145,16 +145,14 @@ function App() {
   const SEG_COLORS = ["#dc2626","#2563eb","#7c3aed","#059669","#ea580c","#0891b2","#d946ef","#ca8a04","#475569","#be123c"];
   const segColor = (i) => SEG_COLORS[i % SEG_COLORS.length];
 
-  // ─── SVG SITE PLAN (like GeoWeb aerial) ───
+  // ─── SVG SITE PLAN (based on GeoWeb Rosenweg / Hinterbüelstrasse) ───
   const renderSitePlan = () => {
-    const W = 420, H = 520;
-    const SCALE = 0.04;
-    const MIN_PX = 30;
+    const W = 440, H = 480;
+    const SCALE = 0.038;
+    const MIN_PX = 25;
 
-    const bldg = { x: 110, y: 40, w: 130, h: 320 };
-    const road = { x: 80, y: 30, w: 30, h: 370 };
-
-    const startX = 95, startY = 65;
+    // Railing start point: left side along Rosenweg, south of building 2434
+    const startX = 40, startY = 210;
     let pts = [{ x: startX, y: startY }];
     let segData = [];
 
@@ -164,26 +162,28 @@ function App() {
       let end;
       switch (seg.direction) {
         case DIR.RIGHT: end = { x: p.x + len, y: p.y }; break;
-        case DIR.DOWN: end = { x: p.x, y: p.y + len }; break;
-        case DIR.LEFT: end = { x: p.x - len, y: p.y }; break;
-        case DIR.UP: end = { x: p.x, y: p.y - len }; break;
-        default: end = { x: p.x + len, y: p.y };
+        case DIR.DOWN:  end = { x: p.x, y: p.y + len }; break;
+        case DIR.LEFT:  end = { x: p.x - len, y: p.y }; break;
+        case DIR.UP:    end = { x: p.x, y: p.y - len }; break;
+        default:        end = { x: p.x + len, y: p.y };
       }
       segData.push({ s: { ...p }, e: { ...end }, seg, i });
       pts.push(end);
     });
 
-    const allX = [...pts.map(p => p.x), bldg.x, bldg.x + bldg.w, road.x];
-    const allY = [...pts.map(p => p.y), bldg.y, bldg.y + bldg.h, road.y + road.h];
-    const padL = 55, padR = 40, padT = 55, padB = 50;
+    // Auto-fit viewport
+    const fixedPts = [
+      { x: 0, y: 0 }, { x: 400, y: 0 }, { x: 400, y: 400 }, { x: 0, y: 400 }
+    ];
+    const allX = [...pts.map(p => p.x), ...fixedPts.map(p => p.x)];
+    const allY = [...pts.map(p => p.y), ...fixedPts.map(p => p.y)];
+    const padL = 15, padR = 15, padT = 50, padB = 55;
     const mnX = Math.min(...allX), mxX = Math.max(...allX);
     const mnY = Math.min(...allY), mxY = Math.max(...allY);
-    const contentW = mxX - mnX, contentH = mxY - mnY;
-    const scaleX = (W - padL - padR) / Math.max(contentW, 1);
-    const scaleY = (H - padT - padB) / Math.max(contentH, 1);
-    const sc = Math.min(scaleX, scaleY, 2.5);
-    const offX = padL - mnX * sc + (W - padL - padR - contentW * sc) / 2;
-    const offY = padT - mnY * sc + (H - padT - padB - contentH * sc) / 2;
+    const contentW = mxX - mnX || 1, contentH = mxY - mnY || 1;
+    const sc = Math.min((W - padL - padR) / contentW, (H - padT - padB) / contentH, 1.2);
+    const offX = padL + (W - padL - padR - contentW * sc) / 2 - mnX * sc;
+    const offY = padT + (H - padT - padB - contentH * sc) / 2 - mnY * sc;
     const tx = (x) => x * sc + offX;
     const ty = (y) => y * sc + offY;
     const tl = (l) => l * sc;
@@ -195,9 +195,9 @@ function App() {
         }}>
           <div className="flex items-center gap-2">
             <span className="text-white text-sm font-bold">Lageplan</span>
-            <span className="text-slate-400 text-[10px] bg-slate-700 px-2 py-0.5 rounded-full">1:100</span>
+            <span className="text-slate-400 text-[10px] bg-slate-700 px-2 py-0.5 rounded-full">Rosenweg / Hinterbüelstr.</span>
           </div>
-          <span className="text-slate-400 text-xs font-mono">{(totalLength/1000).toFixed(2)}m total</span>
+          <span className="text-slate-400 text-xs font-mono">{(totalLength/1000).toFixed(2)}m</span>
         </div>
 
         <div className="overflow-auto bg-slate-50" style={{ WebkitOverflowScrolling: "touch" }}>
@@ -209,50 +209,84 @@ function App() {
               <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
                 <feDropShadow dx="1" dy="2" stdDeviation="3" floodColor="#00000020"/>
               </filter>
-              <linearGradient id="roadGrad" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%" stopColor="#94a3b8"/>
-                <stop offset="50%" stopColor="#64748b"/>
-                <stop offset="100%" stopColor="#94a3b8"/>
+              <linearGradient id="roadH" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#94a3b8"/><stop offset="50%" stopColor="#78716c"/><stop offset="100%" stopColor="#94a3b8"/>
+              </linearGradient>
+              <linearGradient id="roadV" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stopColor="#94a3b8"/><stop offset="50%" stopColor="#78716c"/><stop offset="100%" stopColor="#94a3b8"/>
               </linearGradient>
             </defs>
             <rect width={W} height={H} fill="url(#grd)"/>
 
-            {/* Parking */}
-            <rect x={tx(10)} y={ty(40)} width={tl(60)} height={tl(200)} rx="3"
-              fill="#e2e8f0" stroke="#cbd5e1" strokeWidth="0.5" opacity="0.5"/>
-            <text x={tx(40)} y={ty(140)} textAnchor="middle" fill="#94a3b8" fontSize="8"
-              fontFamily="system-ui" transform={`rotate(-90,${tx(40)},${ty(140)})`}>Parkplatz</text>
+            {/* ── Rosenweg (horizontal road, bottom area) ── */}
+            <rect x={tx(-10)} y={ty(230)} width={tl(420)} height={tl(40)} rx="2"
+              fill="url(#roadH)" opacity="0.35"/>
+            <line x1={tx(10)} y1={ty(250)} x2={tx(380)} y2={ty(250)}
+              stroke="#f8fafc" strokeWidth="1.5" strokeDasharray="10,8" opacity="0.4"/>
+            <text x={tx(160)} y={ty(253)} fill="#475569" fontSize="10" fontWeight="700"
+              fontFamily="system-ui" letterSpacing="4">ROSENWEG</text>
 
-            {/* Road */}
-            <rect x={tx(road.x)} y={ty(road.y)} width={tl(road.w)} height={tl(road.h)} rx="2"
-              fill="url(#roadGrad)" opacity="0.4"/>
-            <line x1={tx(road.x + road.w/2)} y1={ty(road.y + 10)} x2={tx(road.x + road.w/2)} y2={ty(road.y + road.h - 10)}
-              stroke="#f8fafc" strokeWidth="1.5" strokeDasharray="8,6" opacity="0.5"/>
-            <text x={tx(road.x + road.w/2)} y={ty(road.y + road.h/2)} textAnchor="middle"
-              fill="#475569" fontSize="9" fontWeight="600" fontFamily="system-ui" letterSpacing="3"
-              transform={`rotate(-90,${tx(road.x + road.w/2)},${ty(road.y + road.h/2)})`}>
-              ROSENWEG
-            </text>
+            {/* ── Hinterbüelstrasse (vertical road, right side) ── */}
+            <rect x={tx(330)} y={ty(-10)} width={tl(40)} height={tl(420)} rx="2"
+              fill="url(#roadV)" opacity="0.35"/>
+            <line x1={tx(350)} y1={ty(10)} x2={tx(350)} y2={ty(380)}
+              stroke="#f8fafc" strokeWidth="1.5" strokeDasharray="10,8" opacity="0.4"/>
+            <text x={tx(350)} y={ty(180)} textAnchor="middle"
+              fill="#475569" fontSize="9" fontWeight="700" fontFamily="system-ui" letterSpacing="3"
+              transform={`rotate(-90,${tx(350)},${ty(180)})`}>HINTERBÜELSTR.</text>
 
-            {/* Building */}
-            <rect x={tx(bldg.x)} y={ty(bldg.y)} width={tl(bldg.w)} height={tl(bldg.h)} rx="2"
-              fill="#78716c" opacity="0.35" stroke="#57534e" strokeWidth="0.8" filter="url(#shadow)"/>
-            {[0.15, 0.3, 0.45, 0.6, 0.75, 0.88].map((f, i) => (
-              <rect key={i} x={tx(bldg.x + 8)} y={ty(bldg.y + bldg.h * f)} width={tl(bldg.w - 16)} height={tl(12)}
-                fill="#57534e" opacity="0.15" rx="1"/>
+            {/* ── Sidewalk along Rosenweg (north side) ── */}
+            <rect x={tx(-10)} y={ty(218)} width={tl(350)} height={tl(14)} rx="1"
+              fill="#d6d3d1" opacity="0.25"/>
+
+            {/* ── Parking (far left) ── */}
+            <rect x={tx(-5)} y={ty(100)} width={tl(40)} height={tl(110)} rx="3"
+              fill="#e2e8f0" stroke="#cbd5e1" strokeWidth="0.5" opacity="0.4"/>
+            <text x={tx(15)} y={ty(160)} textAnchor="middle" fill="#94a3b8" fontSize="7"
+              fontFamily="system-ui" transform={`rotate(-90,${tx(15)},${ty(160)})`}>Parkplatz</text>
+
+            {/* ── Building 2434 / IE7652 (main building, north of railing) ── */}
+            <rect x={tx(50)} y={ty(60)} width={tl(250)} height={tl(145)} rx="3"
+              fill="#78716c" opacity="0.3" stroke="#57534e" strokeWidth="0.8" filter="url(#shadow)"/>
+            {[0.2, 0.4, 0.6, 0.8].map((f, i) => (
+              <rect key={`w${i}`} x={tx(60)} y={ty(60 + 145 * f)} width={tl(230)} height={tl(10)}
+                fill="#57534e" opacity="0.12" rx="1"/>
             ))}
-            <text x={tx(bldg.x + bldg.w/2)} y={ty(bldg.y + bldg.h/2)} textAnchor="middle"
-              fill="#44403c" fontSize="9" fontWeight="700" fontFamily="system-ui" opacity="0.5">Gebäude</text>
-            <text x={tx(bldg.x + bldg.w/2)} y={ty(bldg.y + bldg.h/2 + 14)} textAnchor="middle"
-              fill="#44403c" fontSize="7" fontFamily="system-ui" opacity="0.4">IE7652</text>
+            <text x={tx(175)} y={ty(125)} textAnchor="middle"
+              fill="#44403c" fontSize="10" fontWeight="800" fontFamily="system-ui" opacity="0.45">2434</text>
+            <text x={tx(175)} y={ty(140)} textAnchor="middle"
+              fill="#44403c" fontSize="7.5" fontFamily="system-ui" opacity="0.35">IE7652</text>
 
-            {/* Zone 30 */}
-            <g transform={`translate(${tx(70)},${ty(road.y + road.h - 20)})`}>
-              <circle r="10" fill="white" stroke="#dc2626" strokeWidth="1.5" opacity="0.6"/>
-              <text textAnchor="middle" y="3" fill="#dc2626" fontSize="7" fontWeight="700" opacity="0.6">30</text>
+            {/* ── Building 2432 / IE186 (top right) ── */}
+            <rect x={tx(310)} y={ty(20)} width={tl(55)} height={tl(80)} rx="2"
+              fill="#78716c" opacity="0.2" stroke="#57534e" strokeWidth="0.5"/>
+            <text x={tx(337)} y={ty(55)} textAnchor="middle"
+              fill="#44403c" fontSize="7" fontWeight="700" fontFamily="system-ui" opacity="0.35">2432</text>
+            <text x={tx(337)} y={ty(66)} textAnchor="middle"
+              fill="#44403c" fontSize="5.5" fontFamily="system-ui" opacity="0.25">IE186</text>
+
+            {/* ── Building 2505 (bottom right, across Hinterbüelstr.) ── */}
+            <rect x={tx(375)} y={ty(230)} width={tl(40)} height={tl(80)} rx="2"
+              fill="#78716c" opacity="0.2" stroke="#57534e" strokeWidth="0.5"/>
+            <text x={tx(395)} y={ty(270)} textAnchor="middle"
+              fill="#44403c" fontSize="7" fontWeight="700" fontFamily="system-ui" opacity="0.35">2505</text>
+
+            {/* ── Stadtpolizei (left area) ── */}
+            <rect x={tx(-5)} y={ty(280)} width={tl(70)} height={tl(80)} rx="2"
+              fill="#78716c" opacity="0.15" stroke="#57534e" strokeWidth="0.5"/>
+            <text x={tx(30)} y={ty(320)} textAnchor="middle"
+              fill="#44403c" fontSize="6" fontWeight="600" fontFamily="system-ui" opacity="0.3">Stadtpolizei</text>
+
+            {/* ── Intersection circle ── */}
+            <circle cx={tx(350)} cy={ty(250)} r={tl(8)} fill="none" stroke="#94a3b8" strokeWidth="0.5" opacity="0.3"/>
+
+            {/* ── Zone 30 sign ── */}
+            <g transform={`translate(${tx(80)},${ty(255)})`}>
+              <circle r="9" fill="white" stroke="#dc2626" strokeWidth="1.5" opacity="0.5"/>
+              <text textAnchor="middle" y="3" fill="#dc2626" fontSize="7" fontWeight="700" opacity="0.5">30</text>
             </g>
 
-            {/* Railing segments */}
+            {/* ── Railing segments ── */}
             {segData.map(({ s, e, seg, i: idx }) => {
               const x1 = tx(s.x), y1 = ty(s.y), x2 = tx(e.x), y2 = ty(e.y);
               const isH = seg.direction === DIR.RIGHT || seg.direction === DIR.LEFT;
@@ -261,7 +295,7 @@ function App() {
               const OFF = 10;
               let lx1, ly1, lx2, ly2;
               if (isH) { lx1=x1; ly1=y1+OFF; lx2=x2; ly2=y2+OFF; }
-              else { lx1=x1+OFF; ly1=y1; lx2=x2+OFF; ly2=y2; }
+              else     { lx1=x1+OFF; ly1=y1; lx2=x2+OFF; ly2=y2; }
               const mx = (x1+x2)/2, my = (y1+y2)/2;
 
               const barCount = Math.max(3, Math.floor(Math.hypot(x2-x1, y2-y1) / 8));
@@ -277,7 +311,6 @@ function App() {
                   );
                 }
               }
-
               const lengthM = ((parseInt(seg.lengthOben)||0)/1000).toFixed(2);
 
               return (
@@ -286,29 +319,22 @@ function App() {
                     width={Math.abs(Math.max(x2,lx2)-Math.min(x1,lx1))+20}
                     height={Math.abs(Math.max(y2,ly2)-Math.min(y1,ly1))+20}
                     fill="transparent"/>
-
                   {active && <line x1={x1} y1={y1} x2={x2} y2={y2}
                     stroke={color} strokeWidth="14" opacity="0.12" strokeLinecap="round"/>}
-
                   <line x1={x1} y1={y1} x2={x2} y2={y2}
                     stroke={color} strokeWidth={active ? 5 : 3.5} strokeLinecap="round"/>
-
                   {seg.hasUnten && <>{bars}
                     <line x1={lx1} y1={ly1} x2={lx2} y2={ly2}
                       stroke={color} strokeWidth={2} strokeLinecap="round" strokeDasharray="5,3" opacity="0.5"/></>}
-
                   <circle cx={x1} cy={y1} r="3" fill={color} stroke="white" strokeWidth="1"/>
                   <circle cx={x2} cy={y2} r="3" fill={color} stroke="white" strokeWidth="1"/>
-
                   <rect x={mx-9} y={my-(isH?20:5)-8} width="18" height="16" rx="4" fill={color}/>
                   <text x={mx} y={my-(isH?20:5)+4} textAnchor="middle" fill="white"
                     fontSize="10" fontWeight="800" fontFamily="system-ui">{seg.nr}</text>
-
                   <rect x={mx+(isH?-18:16)} y={my+(isH?6:-6)} width="36" height="13" rx="2"
                     fill="white" stroke={color} strokeWidth="0.5" opacity="0.9"/>
                   <text x={mx+(isH?0:34)} y={my+(isH?15:4)} textAnchor="middle"
                     fill={color} fontSize="8" fontWeight="700" fontFamily="system-ui">{lengthM}m</text>
-
                   <text x={mx+(isH?0:28)} y={my+(isH?25:16)} textAnchor="middle"
                     fill={color} fontSize="6" fontWeight="600" fontFamily="system-ui" opacity="0.6">
                     {seg.typeOben === "ganz" ? "GANZ" : "HALB"}</text>
@@ -316,12 +342,12 @@ function App() {
               );
             })}
 
+            {/* Start / End markers */}
             {segData.length > 0 && <>
               <circle cx={tx(segData[0].s.x)} cy={ty(segData[0].s.y)} r="7"
                 fill="#16a34a" stroke="white" strokeWidth="2" filter="url(#shadow)"/>
               <text x={tx(segData[0].s.x)} y={ty(segData[0].s.y)-12} textAnchor="middle"
                 fill="#16a34a" fontSize="7" fontWeight="800" fontFamily="system-ui">START</text>
-
               <circle cx={tx(segData[segData.length-1].e.x)} cy={ty(segData[segData.length-1].e.y)} r="7"
                 fill="#dc2626" stroke="white" strokeWidth="2" filter="url(#shadow)"/>
               <text x={tx(segData[segData.length-1].e.x)} y={ty(segData[segData.length-1].e.y)+18}
@@ -336,14 +362,13 @@ function App() {
               <text y="-14" textAnchor="middle" fill="#475569" fontSize="7" fontWeight="800">N</text>
             </g>
 
-            {/* Scale */}
+            {/* Scale bar */}
             <g transform={`translate(15,${H-18})`}>
               <line x1="0" y1="0" x2={tl(100)} y2="0" stroke="#475569" strokeWidth="1"/>
               <line x1="0" y1="-3" x2="0" y2="3" stroke="#475569" strokeWidth="1"/>
               <line x1={tl(100)} y1="-3" x2={tl(100)} y2="3" stroke="#475569" strokeWidth="1"/>
               <text x="0" y="10" fill="#64748b" fontSize="6" fontFamily="system-ui">0</text>
               <text x={tl(100)} y="10" textAnchor="middle" fill="#64748b" fontSize="6" fontFamily="system-ui">10m</text>
-              <text x={tl(100)+25} y="2" fill="#94a3b8" fontSize="6" fontFamily="system-ui">1:100</text>
             </g>
 
             {/* Legend */}
@@ -357,12 +382,13 @@ function App() {
               <text x="129" y="3" fill="#64748b" fontSize="6.5" fontFamily="system-ui">Start / Ende</text>
             </g>
 
+            {/* Title */}
             <g transform="translate(15,15)">
-              <rect width="140" height="30" rx="4" fill="white" stroke="#e2e8f0" strokeWidth="0.5" opacity="0.95"/>
+              <rect width="175" height="30" rx="4" fill="white" stroke="#e2e8f0" strokeWidth="0.5" opacity="0.95"/>
               <text x="8" y="12" fill="#1e293b" fontSize="7.5" fontWeight="700" fontFamily="system-ui">
-                Geländer Rosenweg</text>
+                Geländer Rosenweg · IE7652</text>
               <text x="8" y="23" fill="#64748b" fontSize="6.5" fontFamily="system-ui">
-                {segments.length} Segmente · {(totalLength/1000).toFixed(2)}m · IE7652</text>
+                {segments.length} Segmente · {(totalLength/1000).toFixed(2)}m · 8307 Illnau-Effretikon</text>
             </g>
           </svg>
         </div>
