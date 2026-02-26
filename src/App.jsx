@@ -72,6 +72,9 @@ function App() {
   const [showExport, setShowExport] = useState(false);
   const [toast, setToast] = useState("");
   const [editingSegment, setEditingSegment] = useState(null);
+  const [startPoint, setStartPoint] = useState({ x: 40, y: 210 });
+  const [pickingStart, setPickingStart] = useState(false);
+  const svgRef = useRef(null);
 
   useEffect(() => {
     try {
@@ -85,6 +88,7 @@ function App() {
         if (d.protokoll) setProtokoll(d.protokoll);
         if (d.abnahme) setAbnahme(d.abnahme);
         if (d.aufbauChecked) setAufbauChecked(d.aufbauChecked);
+        if (d.startPoint) setStartPoint(d.startPoint);
       }
     } catch (e) {}
     setLoaded(true);
@@ -95,12 +99,12 @@ function App() {
     const t = setTimeout(() => {
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify({
-          project, checklist, segments, pfostenList, protokoll, abnahme, aufbauChecked,
+          project, checklist, segments, pfostenList, protokoll, abnahme, aufbauChecked, startPoint,
         }));
       } catch (e) {}
     }, 600);
     return () => clearTimeout(t);
-  }, [project, checklist, segments, pfostenList, protokoll, abnahme, aufbauChecked, loaded]);
+  }, [project, checklist, segments, pfostenList, protokoll, abnahme, aufbauChecked, startPoint, loaded]);
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 2200); };
   const totalLength = segments.reduce((s, seg) => s + (parseInt(seg.lengthOben) || 0), 0);
@@ -138,6 +142,7 @@ function App() {
     setSegments([{ id: 1, nr: 1, lengthOben: 2000, typeOben: "ganz", hasUnten: true, lengthUnten: 2000, direction: DIR.RIGHT, bemerkungen: "" }]);
     setPfostenList([]); setProtokoll([]); setAbnahme(defaultAbnahme);
     setAufbauChecked(Array(AUFBAU_STEPS.length).fill(false)); setEditingSegment(null);
+    setStartPoint({ x: 40, y: 210 }); setPickingStart(false);
     try { localStorage.removeItem(STORAGE_KEY); } catch(e) {}
     showToast("Zurückgesetzt"); setShowExport(false);
   };
@@ -151,8 +156,8 @@ function App() {
     const SCALE = 0.038;
     const MIN_PX = 25;
 
-    // Railing start point: left side along Rosenweg, south of building 2434
-    const startX = 40, startY = 210;
+    // Railing start point: configurable via click
+    const startX = startPoint.x, startY = startPoint.y;
     let pts = [{ x: startX, y: startY }];
     let segData = [];
 
@@ -187,21 +192,44 @@ function App() {
     const tx = (x) => x * sc + offX;
     const ty = (y) => y * sc + offY;
     const tl = (l) => l * sc;
+    // Inverse transform for click → logical coords
+    const fromSvg = (px, py) => ({ x: (px - offX) / sc, y: (py - offY) / sc });
+
+    const handleSvgClick = (e) => {
+      if (!pickingStart) return;
+      const svg = svgRef.current;
+      if (!svg) return;
+      const rect = svg.getBoundingClientRect();
+      const svgX = (e.clientX - rect.left) / rect.width * W;
+      const svgY = (e.clientY - rect.top) / rect.height * H;
+      const pt = fromSvg(svgX, svgY);
+      setStartPoint({ x: Math.round(pt.x), y: Math.round(pt.y) });
+      setPickingStart(false);
+      showToast("Startpunkt gesetzt");
+    };
 
     return (
-      <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden mb-3">
-        <div className="px-4 py-2.5 flex items-center justify-between" style={{
+      <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
+        <div className="px-4 py-2 flex items-center justify-between" style={{
           background: "linear-gradient(135deg, #1e293b 0%, #334155 100%)"
         }}>
           <div className="flex items-center gap-2">
             <span className="text-white text-sm font-bold">Lageplan</span>
             <span className="text-slate-400 text-[10px] bg-slate-700 px-2 py-0.5 rounded-full">Rosenweg / Hinterbüelstr.</span>
           </div>
-          <span className="text-slate-400 text-xs font-mono">{(totalLength/1000).toFixed(2)}m</span>
+          <div className="flex items-center gap-2">
+            <span className="text-slate-400 text-xs font-mono">{(totalLength/1000).toFixed(2)}m</span>
+            <button onClick={() => setPickingStart(!pickingStart)}
+              className={`text-[10px] px-2 py-1 rounded-full font-bold transition-all ${
+                pickingStart ? "bg-green-500 text-white animate-pulse" : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+              }`}>{pickingStart ? "Klicke auf Plan..." : "Startpunkt"}</button>
+          </div>
         </div>
 
-        <div className="overflow-auto bg-slate-50" style={{ WebkitOverflowScrolling: "touch" }}>
-          <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ display: "block", width: "100%", height: "auto" }}>
+        <div className="overflow-auto bg-slate-50" style={{ WebkitOverflowScrolling: "touch" }}
+          onClick={handleSvgClick}>
+          <svg ref={svgRef} width={W} height={H} viewBox={`0 0 ${W} ${H}`}
+            style={{ display: "block", width: "100%", height: "auto", cursor: pickingStart ? "crosshair" : "default" }}>
             <defs>
               <pattern id="grd" width="15" height="15" patternUnits="userSpaceOnUse">
                 <path d="M15 0L0 0 0 15" fill="none" stroke="#e2e8f0" strokeWidth="0.3"/>
@@ -759,55 +787,60 @@ table{width:100%;border-collapse:collapse;margin-bottom:16px}th{text-align:left;
   );
 
   const content = {
-    skizze: () => <div>{renderSitePlan()}{renderSegmentEditor()}</div>,
+    skizze: () => <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">{renderSitePlan()}<div>{renderSegmentEditor()}</div></div>,
     projekt: renderProjekt, checkliste: renderCheckliste, pfosten: renderPfosten,
     ausbau: renderAusbau, aufbau: renderAufbau, abnahme: renderAbnahme,
   };
 
   return (
-    <div className="min-h-screen bg-stone-100" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="h-screen flex flex-col bg-stone-100 overflow-hidden" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
 
-      <div className="text-white px-4 pt-5 pb-4 sticky top-0 z-30" style={{
+      {/* Header */}
+      <div className="text-white px-4 py-3 flex-shrink-0" style={{
         background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)" }}>
-        <div className="max-w-lg mx-auto">
+        <div className="max-w-5xl mx-auto">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-lg font-bold tracking-tight">Geländer-Doku</h1>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <h1 className="text-base font-bold tracking-tight">Geländer-Doku</h1>
+              <p className="text-[11px] text-slate-400 mt-0.5">
                 {project.standort} · <span className="font-mono">{(totalLength/1000).toFixed(1)}m</span> · {segments.length} Seg.</p>
             </div>
             <button onClick={() => setShowExport(!showExport)}
-              className="w-9 h-9 rounded-full bg-slate-800 flex items-center justify-center hover:bg-slate-700">
+              className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center hover:bg-slate-700">
               <span className="text-sm">⚙</span></button>
           </div>
           {showExport && (
-            <div className="mt-3 p-3 bg-slate-800 rounded-xl space-y-2">
+            <div className="mt-2 p-2 bg-slate-800 rounded-xl flex gap-2">
               <button onClick={handleExportJSON}
-                className="w-full py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-sm font-semibold">
-                📥 JSON exportieren</button>
+                className="flex-1 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-semibold">
+                JSON exportieren</button>
               <button onClick={handleReset}
-                className="w-full py-2.5 bg-red-900/50 hover:bg-red-900 text-red-300 rounded-lg text-sm font-medium">
-                🗑 Zurücksetzen</button>
+                className="flex-1 py-2 bg-red-900/50 hover:bg-red-900 text-red-300 rounded-lg text-xs font-medium">
+                Zurücksetzen</button>
             </div>)}
         </div>
       </div>
 
-      <div className="bg-white border-b border-stone-200 sticky top-[72px] z-20 shadow-sm">
-        <div className="max-w-lg mx-auto">
+      {/* Tabs */}
+      <div className="bg-white border-b border-stone-200 flex-shrink-0 shadow-sm">
+        <div className="max-w-5xl mx-auto">
           <div className="flex overflow-x-auto" style={{ scrollbarWidth: "none" }}>
             {TABS.map(tab => (
               <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-                className={`flex-shrink-0 flex flex-col items-center py-2 px-3 text-center transition-all border-b-2 ${
+                className={`flex-shrink-0 flex items-center gap-1.5 py-2 px-3 text-center transition-all border-b-2 ${
                   activeTab===tab.key?"border-amber-600 text-amber-700":"border-transparent text-stone-400 hover:text-stone-600"}`}>
-                <span className="text-base">{tab.icon}</span>
-                <span className="text-[10px] font-semibold mt-0.5">{tab.label}</span>
+                <span className="text-sm">{tab.icon}</span>
+                <span className="text-[11px] font-semibold">{tab.label}</span>
               </button>))}
           </div>
         </div>
       </div>
 
-      <div className="max-w-lg mx-auto px-4 py-4 pb-8">{content[activeTab]?.()}</div>
+      {/* Content - fills remaining space */}
+      <div className="flex-1 overflow-auto">
+        <div className="max-w-5xl mx-auto px-4 py-4 pb-8">{content[activeTab]?.()}</div>
+      </div>
 
       {toast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-5 py-3 rounded-full text-sm font-medium shadow-lg"
